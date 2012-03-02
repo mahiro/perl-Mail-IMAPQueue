@@ -163,7 +163,7 @@ subtest methods => sub {
 		is_deeply(scalar($queue->peek_messages), [6]);
 		
 		# Discard buffer, and forcefully fetch new messages
-		$queue->fetch_messages;
+		$queue->update_messages;
 		
 		ok !$queue->is_empty;
 		is($queue->peek_message, 7);
@@ -177,7 +177,7 @@ subtest methods => sub {
 		is(scalar($queue->peek_messages), undef);
 		
 		# Fetch messages (non-blocking) where nothing new on the server side
-		$queue->fetch_messages;
+		$queue->update_messages;
 		
 		ok $queue->is_empty;
 		is($queue->peek_message, undef);

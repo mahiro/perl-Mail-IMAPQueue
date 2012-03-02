@@ -37,7 +37,7 @@ sub new {
 		}
 		
 		$self->{uidnext} = $imap->uidnext($imap->Folder);
-		$self->fetch_messages;
+		$self->update_messages;
 		$self->dequeue_messages if defined $self->peek_message;
 	}
 	
@@ -104,7 +104,7 @@ sub ensure_messages {
 	
 	if ($self->is_empty) {
 		while (1) {
-			$self->fetch_messages or return undef;
+			$self->update_messages or return undef;
 			
 			if ($self->is_empty) {
 				$self->attempt_idle() or return undef;
@@ -167,7 +167,7 @@ sub attempt_idle {
 	return $self;
 }
 
-sub fetch_messages {
+sub update_messages {
 	my ($self) = @_;
 	
 	my $uidnext = $self->{uidnext};
