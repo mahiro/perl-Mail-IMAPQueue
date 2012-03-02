@@ -5,6 +5,7 @@ use warnings;
 package Mail::IMAPQueue;
 our $VERSION = '0.1';
 
+use List::Util qw(max);
 use Scalar::Util qw(blessed);
 
 sub new {
@@ -181,29 +182,12 @@ sub fetch_messages {
 		}
 		
 		eval {
-			# UIDNEXT must be called before SEARCH, where this UIDNEXT will
-			# be used in the *next* fetch, not this current fetch.
-			# This is how to avoid dropping any messages delivered between
-			# invocations of SEARCH and UIDNEXT etc.
-			my $next_uidnext = $imap->uidnext($imap->Folder);
-			defined $next_uidnext or die $imap;
-			
 			unless (defined $uidnext) {
 				# Initially $uidnext is undef (except it was set explicitly)
-				$uidnext = $next_uidnext;
 				$buffer = $imap->messages or die $imap;
 			} else {
 				$buffer = $imap->search("UID $uidnext:*") or die $imap;
-				
-				# Any messages delivered between the last UIDNEXT and SEARCH
-				# should be excluded.
-				$buffer = [grep {
-					$uidnext <= $_ && $_ < $next_uidnext
-				} @$buffer];
-				
-				if (@$buffer > 0) {
-					$uidnext = $next_uidnext;
-				}
+				$buffer = [grep {$uidnext <= $_} @$buffer];
 			}
 		};
 		
@@ -217,11 +201,13 @@ sub fetch_messages {
 		}
 	}
 	
-	if ($buffer) {
+	if (@$buffer > 0) {
+		$uidnext = max(@$buffer) + 1;
 		$self->{uidnext} = $uidnext;
-		$self->{buffer} = $buffer;
-		$self->{index} = 0;
 	}
+	
+	$self->{buffer} = $buffer;
+	$self->{index} = 0;
 	
 	return $self;
 }

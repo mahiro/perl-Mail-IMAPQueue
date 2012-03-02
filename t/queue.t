@@ -3,7 +3,7 @@ use 5.008_001;
 use strict;
 use warnings;
 
-use Test::More tests => 6;
+use Test::More tests => 5;
 use File::Basename;
 
 use lib dirname(__FILE__).'/lib';
@@ -183,38 +183,6 @@ subtest methods => sub {
 		is($queue->peek_message, undef);
 		is(scalar($queue->peek_messages), undef);
 	});
-};
-
-subtest messages_right_after_uidnext => sub {
-	plan tests => 1;
-	my $orig_method = \&Mail::IMAPClient::uidnext;
-	my $i = 0;
-	
-	no warnings qw(redefine);
-	
-	local *Mail::IMAPClient::uidnext = sub {
-		my $imap = shift;
-		my $ret = $orig_method->($imap, @_);
-		
-		if ($i >= 3) {
-			add_message($imap) foreach 1..2;
-		}
-		
-		return $ret;
-	};
-	
-	my $got = [];
-	
-	run(sub {
-		my ($queue, $imap) = @_;
-		
-		for ($i = 0; defined(my $msg = $queue->dequeue_message); $i++) {
-			push @$got, $msg;
-			last if $i >= 6;
-		}
-	});
-	
-	is_deeply($got, [1, 2, 3, 4, 5, 6, 7]);
 };
 
 subtest messages_during_idle => sub {
