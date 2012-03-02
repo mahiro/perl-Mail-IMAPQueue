@@ -30,7 +30,7 @@ sub new {
 	
 	if ($self->{skip_initial}) {
 		unless ($imap->IsSelected) {
-			$@ = "folder must be selected";
+			$@ = "Folder must be selected";
 			return undef;
 		}
 		
@@ -133,7 +133,7 @@ sub attempt_idle {
 	if ($@) {
 		if (ref $@ && $@ == $imap) {
 			$imap->reconnect or do {
-				$@ = "disconnected while attempting IDLE";
+				$@ = "Disconnected while attempting IDLE";
 				return undef;
 			};
 		} else {
@@ -154,7 +154,7 @@ sub update_messages {
 		my $imap = $self->{client};
 		
 		unless ($imap->IsSelected) {
-			$@ = "folder must be selected";
+			$@ = "Folder must be selected";
 			return undef;
 		}
 		
