@@ -89,7 +89,7 @@ sub peek_message {
 
 sub peek_messages {
 	my ($self) = @_;
-	return undef if $self->is_empty;
+	return [] if $self->is_empty;
 	
 	my $index = $self->{index};
 	my $buffer = $self->{buffer};

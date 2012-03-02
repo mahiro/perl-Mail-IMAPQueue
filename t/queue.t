@@ -131,14 +131,14 @@ subtest methods => sub {
 		
 		ok $queue->is_empty; # now the buffer is empty
 		is($queue->peek_message, undef);
-		is(scalar($queue->peek_messages), undef);
+		is_deeply(scalar($queue->peek_messages), []);
 		
 		# Add three new messages to the server (but no changes in the client)
 		add_message($imap) foreach 1..3;
 		
 		ok $queue->is_empty; # still empty (expected)
 		is($queue->peek_message, undef);
-		is(scalar($queue->peek_messages), undef);
+		is_deeply(scalar($queue->peek_messages), []);
 		
 		# Load the added messages
 		$queue->ensure_messages;
@@ -174,14 +174,14 @@ subtest methods => sub {
 		
 		ok $queue->is_empty;
 		is($queue->peek_message, undef);
-		is(scalar($queue->peek_messages), undef);
+		is_deeply(scalar($queue->peek_messages), []);
 		
 		# Fetch messages (non-blocking) where nothing new on the server side
 		$queue->update_messages;
 		
 		ok $queue->is_empty;
 		is($queue->peek_message, undef);
-		is(scalar($queue->peek_messages), undef);
+		is_deeply(scalar($queue->peek_messages), []);
 	});
 };
 
