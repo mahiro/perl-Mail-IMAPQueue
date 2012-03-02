@@ -149,7 +149,10 @@ sub attempt_idle {
 	
 	eval {
 		my $idle_tag = $imap->idle or die $imap;
-		my $idle_data = $imap->idle_data($idle_timeout) or die $imap;
+		
+		my $idle_data = $imap->idle_data($idle_timeout);
+		# do not die even if this fails; always send DONE anyway
+		
 		$imap->done($idle_tag) or die $imap;
 	};
 	
