@@ -23,7 +23,7 @@ sub new {
 	
 	my $imap = $self->{client};
 	
-	unless (blessed($imap) && $imap->isa('Mail::IMAPClient')) {
+	unless (blessed($imap)) {
 		$@ = "Parameter 'client' must be given (Mail::IMAPClient)";
 		return undef;
 	}
