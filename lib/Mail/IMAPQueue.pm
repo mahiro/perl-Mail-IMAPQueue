@@ -18,8 +18,6 @@ sub new {
 		uidnext        => undef,
 		skip_initial   => 0,
 		idle_timeout   => 30,
-		sleep_on_retry => 30,
-		max_retry      => undef,
 		@_
 	}, $class;
 	
@@ -118,30 +116,6 @@ sub ensure_messages {
 	return $self;
 }
 
-sub ensure_connection {
-	my ($self) = @_;
-	my $imap = $self->{client};
-	
-	my $max_retry = $self->{max_retry};
-	my $sleep_on_retry = $self->{sleep_on_retry} || 30;
-	
-	$imap->uidvalidity;
-	# try something to see if there has been any disconnection
-	
-	for (my $i = 0; !$imap->reconnect; $i++) {
-		if (defined $max_retry && $i >= $max_retry) {
-			$@ = "reconnect failed and retry count exceeded max_retry";
-			return undef;
-		}
-		
-		if ($sleep_on_retry) {
-			select(undef, undef, undef, $sleep_on_retry);
-		}
-	}
-	
-	return $imap->IsSelected;
-}
-
 sub attempt_idle {
 	my ($self) = @_;
 	my $imap = $self->{client};
@@ -158,7 +132,7 @@ sub attempt_idle {
 	
 	if ($@) {
 		if (ref $@ && $@ == $imap) {
-			$self->ensure_connection() or do {
+			$imap->reconnect or do {
 				$@ = "disconnected while attempting IDLE";
 				return undef;
 			};
@@ -196,7 +170,7 @@ sub update_messages {
 		
 		if ($@) {
 			if (ref $@ && $@ == $imap) {
-				$self->ensure_connection or return undef;
+				$imap->reconnect or return undef;
 				redo TRY;
 			} else {
 				return undef;
