@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 use 5.008_001;
 use strict;
 use warnings;
@@ -186,7 +186,13 @@ subtest methods => sub {
 };
 
 subtest messages_during_idle => sub {
-	plan tests => 1;
+	if ($^O eq 'linux') {
+		plan tests => 1;
+	} else {
+		plan skip_all => 'Works only on Linux';
+		return;
+	}
+	
 	my $orig_method = \&Mail::IMAPClient::idle;
 	my $i = 0;
 	my $flip = 0;
