@@ -21,29 +21,52 @@ use Scalar::Util qw(blessed);
 
 =head1 SYNOPSIS
 
+=head2 Initialization
+
     use Mail::IMAPClient;
     use Mail::IMAPQueue;
     
     my $imap = Mail::IMAPClient->new(
-        ...
+        ... # See Mail::IMAPClient documentation
     ) or die $@;
     
     my $queue = Mail::IMAPQueue->new(
         client => $imap
     ) or die $@;
     
+=head2 Basic usage
+    
     while (defined(my $msg = $queue->dequeue_message())) {
-        # Do something with $msg (sequence number or uid)
+        # Do something with $msg (sequence number or UID)
     }
+
+=head1 DESCRIPTION
+
+This module provides a way to access a mailbox with IMAP protocol,
+regarding the mailbox as a FIFO queue so that the client code can
+continuously process incoming email messages.
+
+The instance of C<Mail::IMAPQueue> maintains a buffer internally, and loads
+the message sequence numbers (of UIDs) as necessary. When there are no
+messages in the mailbox while the buffer is empty, it will wait until new
+messages are received in the mailbox.
+
+It is assumed that the UID assigned to each message is I<strictly ascending>
+as stated in RFC 3501 2.3.1.1. and that the order for any messages to start
+appearing in the result of the SEARCH command is always consistent with
+the order of UIDs.
+
+It is also assumed that the IMAP server provides the IDLE extension (RFC 2177),
+for real-time updates from the server.
 
 =head1 EXAMPLES
 
 =head2 Dumping messages
 
     while (defined(my $msg = $queue->dequeue_message())) {
-        $imap->message_to_file("/tmp/mails/$msg", $msg);
-        $imap->delete_message($msg);
-        $imap->expunge() if $queue->is_empty;
+        $imap->message_to_file("/tmp/mails/$msg", $msg) or die $@;
+        $imap->delete_message($msg) or die $@;
+        $imap->expunge() or die $@ if $queue->is_empty;
     }
 
 =head2 Managing messages with each buffer
@@ -51,28 +74,28 @@ use Scalar::Util qw(blessed);
     while (my $msg_list = $queue->dequeue_messages()) {
         for my $msg (@$msg_list) {
            # Do something with $msg
-           $imap->delete_message($msg);
+           $imap->delete_message($msg) or die $@;
         }
-        $imap->expunge();
+        $imap->expunge() or die $@;
     }
 
 =head2 Controlling timing of fetching and waiting
 
     while ($queue->update_messages()) { # non-blocking
-        my $msg_list = $queue->peek_messages; # non-blocking
+        my $msg_list = $queue->peek_messages or die $@; # non-blocking
         if (@$msg_list) {
             for my $msg (@$msg_list) {
                 # Do something with $msg
             }
         } else {
-            $queue->attempt_idle;
+            $queue->attempt_idle or die $@;
                 # blocking wait for new messages, up to 30 sec.
         }
     }
 
 =head1 METHODS
 
-=head2 new
+=head2 $class->new(client => $imap, ...)
 
 Instanciate a queue object, with the required field C<client> set to a
 L<Mail::IMAPClient> object.
@@ -84,17 +107,32 @@ L<Mail::IMAPClient> object.
         idle_timeout => $seconds,        # default = 30
     ) or die $@;
 
-During the initialization, no IMAP requests are invoked with the C<client> object.
+No IMAP requests are invoked with the C<client> object during the initialization.
+The buffer maintained by this object is initially empty.
 
 =over 4
 
-=item client
+=item * client => $imap
 
-=item uidnext
+The underlying client object. It is assumed to be an instance of L<Mail::IMAPClient>,
+although the type of the object is not enforced.
 
-=item skip_initial
+=item * uidnext => $known_next_uid
 
-=item idle_timeout
+If the next message UID (the smallest UID to be used) is known (e.g. from a previous execution),
+specify the value here.
+
+=item * skip_initial => $true_or_false
+
+Specify a true value to skip all the messages initially in the mailbox.
+If C<uidnext> option is set, this option will be ignored effectively.
+
+=item * idle_timeout => $seconds
+
+Specify the timeout in seconds for the IDLE command (RFC 2177), which allows the IMAP client
+to receive updates from the server in real-time.
+It does I<not> mean the method call will give up when there are no updates after the timeout,
+but it means how frequently it will reset the IDLE command.
 
 =back
 
@@ -123,7 +161,7 @@ sub new {
 	return $self;
 }
 
-=head2 is_empty
+=head2 $queue->is_empty()
 
 Return 1 if the current buffer is empty, and 0 otherwise.
 
@@ -134,7 +172,7 @@ sub is_empty {
 	return $self->{index} >= @{$self->{buffer}};
 }
 
-=head2 dequeue_message
+=head2 $queue->dequeue_message()
 
 Dequeue the next message from the mailbox.
 If the current buffer is non-empty, the next message will be removed from the buffer and returned.
@@ -161,7 +199,7 @@ sub dequeue_message {
 	return $message;
 }
 
-=head2 dequeue_messages
+=head2 $queue->dequeue_messages()
 
 Dequeue the next list of messages.
 If the current buffer is non-empty, all the messages will be removed from the buffer and returned.
@@ -189,7 +227,7 @@ sub dequeue_messages {
 	return wantarray ? @$messages : $messages;
 }
 
-=head2 peek_message
+=head2 $queue->peek_message()
 
 Retrieve the first message in the current buffer without removing the message.
 
@@ -209,7 +247,7 @@ sub peek_message {
 	return $buffer->[$index];
 }
 
-=head2 peek_messages
+=head2 $queue->peek_messages()
 
 Retrieve all the messages in the current buffer without removing the messages.
 
@@ -231,7 +269,7 @@ sub peek_messages {
 	return wantarray ? @$messages : $messages;
 }
 
-=head2 ensure_messages
+=head2 $queue->ensure_messages()
 
 The call is blocked until there is at least one message loaded into the buffer.
 
@@ -258,10 +296,10 @@ sub ensure_messages {
 	return $self;
 }
 
-=head2 attempt_idle
+=head2 $queue->attempt_idle()
 
-Attempt IDLE command so that the call is blocked until there are any updates in the mailbox
-or the timeout (default = 30 sec.) is elapsed.
+Attempt the IDLE command so that the call is blocked until there are any updates in the mailbox
+or the timeout (default = 30 sec.) has elapsed.
 
 The method returns the object itself if successful, and C<undef> otherwise.
 
@@ -295,7 +333,7 @@ sub attempt_idle {
 	return $self;
 }
 
-=head2 update_messages
+=head2 $queue->update_messages()
 
 Discard the current buffer, and attempt to load any messages from the mailbox to the buffer.
 The call is not blocked (except for the usual socket wait for any server response).
@@ -398,6 +436,10 @@ L<http://search.cpan.org/dist/Mail-IMAPQueue/>
 =back
 
 =head1 ACKNOWLEDGEMENTS
+
+The initial package was created by L<Module::Sterter> v1.58.
+
+This module utilizes L<Mail::IMAPClient> as a client library interface.
 
 =head1 LICENSE AND COPYRIGHT
 
