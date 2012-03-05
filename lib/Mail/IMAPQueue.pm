@@ -6,7 +6,7 @@ package Mail::IMAPQueue;
 
 =head1 NAME
 
-Mail::IMAPQueue - IMAP client extension to use a mailbox as a queue of messages
+Mail::IMAPQueue - IMAP client extension to watch and process a mailbox as a queue
 
 =head1 VERSION
 
@@ -21,7 +21,7 @@ use Scalar::Util qw(blessed);
 
 =head1 SYNOPSIS
 
-=head2 Initialization
+=head2 Basic usage
 
     use Mail::IMAPClient;
     use Mail::IMAPQueue;
@@ -30,15 +30,17 @@ use Scalar::Util qw(blessed);
         ... # See Mail::IMAPClient documentation
     ) or die $@;
     
+    $imap->select('INBOX') or die $@;
+    
     my $queue = Mail::IMAPQueue->new(
         client => $imap
     ) or die $@;
     
-=head2 Basic usage
-    
     while (defined(my $msg = $queue->dequeue_message())) {
         # Do something with $msg (sequence number or UID)
     }
+    
+    $imap->close();
 
 =head1 DESCRIPTION
 
@@ -46,22 +48,27 @@ This module provides a way to access a mailbox with IMAP protocol,
 regarding the mailbox as a FIFO queue so that the client code can
 continuously process incoming email messages.
 
-The instance of C<Mail::IMAPQueue> maintains a buffer internally, and loads
-the message sequence numbers (of UIDs) as necessary. When there are no
-messages in the mailbox while the buffer is empty, it will wait until new
-messages are received in the mailbox.
+The module utilizes L<Mail::IMAPClient> as an IMAP client interface.
+
+The instance of C<Mail::IMAPQueue> maintains a buffer internally,
+and loads the message sequence numbers (of UIDs) into the buffer as necessary.
+When there are no messages in the mailbox while the buffer is empty,
+it will wait until new messages are received in the mailbox.
+
+For the purpose of this module, one single mailbox (or a I<folder>) must be
+selected at all times (C<Mail::IMAPClient::select()>).
 
 It is assumed that the UID assigned to each message is I<strictly ascending>
 as stated in RFC 3501 2.3.1.1. and that the order for any messages to start
-appearing in the result of the SEARCH command is always consistent with
+appearing in the result of the C<SEARCH> command is always consistent with
 the order of UIDs.
 
-It is also assumed that the IMAP server provides the IDLE extension (RFC 2177),
+It is also assumed that the IMAP server provides the C<IDLE> extension (RFC 2177),
 for real-time updates from the server.
 
 =head1 EXAMPLES
 
-=head2 Dumping messages
+=head2 Dumping messages into files
 
     while (defined(my $msg = $queue->dequeue_message())) {
         $imap->message_to_file("/tmp/mails/$msg", $msg) or die $@;
@@ -132,7 +139,8 @@ If C<uidnext> option is set, this option will be ignored effectively.
 Specify the timeout in seconds for the IDLE command (RFC 2177), which allows the IMAP client
 to receive updates from the server in real-time.
 It does I<not> mean the method call will give up when there are no updates after the timeout,
-but it means how frequently it will reset the IDLE command.
+but it means how frequently it will reset the IDLE command (with any blocking methods except
+for C<attempt_idle()> method, which is for one timeout round).
 
 =back
 
@@ -177,7 +185,7 @@ sub is_empty {
 Dequeue the next message from the mailbox.
 If the current buffer is non-empty, the next message will be removed from the buffer and returned.
 Otherwise, the call will be blocked until there is at least one message found in the mailbox,
-and then the first message will be removed from the buffer and returned.
+and then the first message will be removed from the loaded buffer and returned.
 
 The method returns the sequence number of the message
 (or UID if the C<Uid> option is turned on for the underlying client).
@@ -302,6 +310,7 @@ Attempt the IDLE command so that the call is blocked until there are any updates
 or the timeout (default = 30 sec.) has elapsed.
 
 The method returns the object itself if successful, and C<undef> otherwise.
+If the timeout has elapsed gracefully, it is considered to be a success.
 
 =cut
 
@@ -339,6 +348,10 @@ Discard the current buffer, and attempt to load any messages from the mailbox to
 The call is not blocked (except for the usual socket wait for any server response).
 
 The method returns the object itself if successful, and C<undef> otherwise.
+
+Note:
+Even if no new messages are loaded, it is a success as long as the server has responded properly.
+In order to test the last result of loading, the C<is_empty()> method can be used.
 
 =cut
 
@@ -437,9 +450,9 @@ L<http://search.cpan.org/dist/Mail-IMAPQueue/>
 
 =head1 ACKNOWLEDGEMENTS
 
-The initial package was created by L<Module::Sterter> v1.58.
+The initial package was created by L<Module::Starter> v1.58.
 
-This module utilizes L<Mail::IMAPClient> as a client library interface.
+This module utilizes L<Mail::IMAPClient> as a client library interface for IMAP.
 
 =head1 LICENSE AND COPYRIGHT
 
