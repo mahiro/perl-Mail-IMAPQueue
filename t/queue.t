@@ -57,22 +57,45 @@ subtest simple => sub {
 };
 
 subtest incoming_messages => sub {
-	plan tests => 1;
+	plan tests => 19;
 	my $got = [];
 	
 	run(sub {
 		my ($queue, $imap) = @_;
 		
-		for (my $i = 0; defined(my $msg = $queue->dequeue_message); $i++) {
+		for (my $i = 0; $i < 6; $i++) {
+			my $msg = $queue->dequeue_message;
+			last unless defined $msg;
+			
 			push @$got, $msg;
 			
-			if ($i == 1) {
+			if ($i == 0) {
+				is($msg, 1);
+				is_deeply(scalar $queue->peek_messages, [2, 3]);
+				ok !$queue->is_empty;
+			} elsif ($i == 1) {
+				is($msg, 2);
+				is_deeply(scalar $queue->peek_messages, [3]);
+				ok !$queue->is_empty;
 				add_message($imap) foreach 1..2;
+			} elsif ($i == 2) {
+				is($msg, 3);
+				is_deeply(scalar $queue->peek_messages, []);
+				ok $queue->is_empty;
+			} elsif ($i == 3) {
+				is($msg, 4);
+				is_deeply(scalar $queue->peek_messages, [5]);
+				ok !$queue->is_empty;
 			} elsif ($i == 4) {
+				is($msg, 5);
+				is_deeply(scalar $queue->peek_messages, []);
+				ok $queue->is_empty;
 				add_message($imap);
+			} elsif ($i == 5) {
+				is($msg, 6);
+				is_deeply(scalar $queue->peek_messages, []);
+				ok $queue->is_empty;
 			}
-			
-			last if $i >= 5;
 		}
 	});
 	
@@ -80,11 +103,13 @@ subtest incoming_messages => sub {
 };
 
 subtest skip_initial => sub {
-	plan tests => 7;
+	plan tests => 8;
 	my $got = [];
 	
 	run(sub {
 		my ($queue, $imap) = @_;
+		$queue->update_messages;
+		is_deeply($queue->peek_messages, []);
 		
 		for (my $i = 0; $i < 6; $i++) {
 			if (defined(my $msg = $queue->peek_message)) {

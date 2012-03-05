@@ -3,10 +3,102 @@ use strict;
 use warnings;
 
 package Mail::IMAPQueue;
-our $VERSION = '0.1';
+
+=head1 NAME
+
+Mail::IMAPQueue - IMAP client extension to use a mailbox as a queue of messages
+
+=head1 VERSION
+
+Version 0.01
+
+=cut
+
+our $VERSION = '0.01';
 
 use List::Util qw(max);
 use Scalar::Util qw(blessed);
+
+=head1 SYNOPSIS
+
+    use Mail::IMAPClient;
+    use Mail::IMAPQueue;
+    
+    my $imap = Mail::IMAPClient->new(
+        ...
+    ) or die $@;
+    
+    my $queue = Mail::IMAPQueue->new(
+        client => $imap
+    ) or die $@;
+    
+    while (defined(my $msg = $queue->dequeue_message())) {
+        # Do something with $msg (sequence number or uid)
+    }
+
+=head1 EXAMPLES
+
+=head2 Dumping messages
+
+    while (defined(my $msg = $queue->dequeue_message())) {
+        $imap->message_to_file("/tmp/mails/$msg", $msg);
+        $imap->delete_message($msg);
+        $imap->expunge() if $queue->is_empty;
+    }
+
+=head2 Managing messages with each buffer
+
+    while (my $msg_list = $queue->dequeue_messages()) {
+        for my $msg (@$msg_list) {
+           # Do something with $msg
+           $imap->delete_message($msg);
+        }
+        $imap->expunge();
+    }
+
+=head2 Controlling timing of fetching and waiting
+
+    while ($queue->update_messages()) { # non-blocking
+        my $msg_list = $queue->peek_messages; # non-blocking
+        if (@$msg_list) {
+            for my $msg (@$msg_list) {
+                # Do something with $msg
+            }
+        } else {
+            $queue->attempt_idle;
+                # blocking wait for new messages, up to 30 sec.
+        }
+    }
+
+=head1 METHODS
+
+=head2 new
+
+Instanciate a queue object, with the required field C<client> set to a
+L<Mail::IMAPClient> object.
+
+    my $queue = Mail::IMAPQueue->new(
+        client       => $imap,
+        uidnext      => $known_next_uid, # default = undef
+        skip_initial => $true_or_false,  # default = 0
+        idle_timeout => $seconds,        # default = 30
+    ) or die $@;
+
+During the initialization, no IMAP requests are invoked with the C<client> object.
+
+=over 4
+
+=item client
+
+=item uidnext
+
+=item skip_initial
+
+=item idle_timeout
+
+=back
+
+=cut
 
 sub new {
 	my $class = shift;
@@ -28,24 +120,32 @@ sub new {
 		return undef;
 	}
 	
-	if ($self->{skip_initial}) {
-		unless ($imap->IsSelected) {
-			$@ = "Folder must be selected";
-			return undef;
-		}
-		
-		$self->{uidnext} = $imap->uidnext($imap->Folder);
-		$self->update_messages;
-		$self->dequeue_messages if defined $self->peek_message;
-	}
-	
 	return $self;
 }
+
+=head2 is_empty
+
+Return 1 if the current buffer is empty, and 0 otherwise.
+
+=cut
 
 sub is_empty {
 	my ($self) = @_;
 	return $self->{index} >= @{$self->{buffer}};
 }
+
+=head2 dequeue_message
+
+Dequeue the next message from the mailbox.
+If the current buffer is non-empty, the next message will be removed from the buffer and returned.
+Otherwise, the call will be blocked until there is at least one message found in the mailbox,
+and then the first message will be removed from the buffer and returned.
+
+The method returns the sequence number of the message
+(or UID if the C<Uid> option is turned on for the underlying client).
+C<undef> is returned if the attempt to load the messages was failed.
+
+=cut
 
 sub dequeue_message {
 	my ($self) = @_;
@@ -61,6 +161,20 @@ sub dequeue_message {
 	return $message;
 }
 
+=head2 dequeue_messages
+
+Dequeue the next list of messages.
+If the current buffer is non-empty, all the messages will be removed from the buffer and returned.
+Otherwise, the call will be blocked until there is at least one message found in the mailbox,
+and then all the loaded messages will be removed and returned.
+
+In the list context, the method returns an array of the message sequence numbers
+(or UIDs if the C<Uid> option is turned on for the underlying client).
+In the scalar context, a reference to the array is returned.
+C<undef> is returned if the attempt to load the messages was failed.
+
+=cut
+
 sub dequeue_messages {
 	my ($self) = @_;
 	$self->ensure_messages;
@@ -75,6 +189,16 @@ sub dequeue_messages {
 	return wantarray ? @$messages : $messages;
 }
 
+=head2 peek_message
+
+Retrieve the first message in the current buffer without removing the message.
+
+The method returns the sequence number of the message
+(or UID if the C<Uid> option is turned on for the underlying client).
+C<undef> is returned if the current buffer is empty.
+
+=cut
+
 sub peek_message {
 	my ($self) = @_;
 	return undef if $self->is_empty;
@@ -84,6 +208,16 @@ sub peek_message {
 	
 	return $buffer->[$index];
 }
+
+=head2 peek_messages
+
+Retrieve all the messages in the current buffer without removing the messages.
+
+In the list context, the method returns an array of the message sequence numbers
+(or UIDs if the C<Uid> option is turned on for the underlying client).
+In the scalar context, a reference to the array is returned.
+
+=cut
 
 sub peek_messages {
 	my ($self) = @_;
@@ -96,6 +230,14 @@ sub peek_messages {
 	
 	return wantarray ? @$messages : $messages;
 }
+
+=head2 ensure_messages
+
+The call is blocked until there is at least one message loaded into the buffer.
+
+The method returns the object itself if successful, and C<undef> otherwise.
+
+=cut
 
 sub ensure_messages {
 	my ($self) = @_;
@@ -115,6 +257,15 @@ sub ensure_messages {
 	
 	return $self;
 }
+
+=head2 attempt_idle
+
+Attempt IDLE command so that the call is blocked until there are any updates in the mailbox
+or the timeout (default = 30 sec.) is elapsed.
+
+The method returns the object itself if successful, and C<undef> otherwise.
+
+=cut
 
 sub attempt_idle {
 	my ($self) = @_;
@@ -144,6 +295,15 @@ sub attempt_idle {
 	return $self;
 }
 
+=head2 update_messages
+
+Discard the current buffer, and attempt to load any messages from the mailbox to the buffer.
+The call is not blocked (except for the usual socket wait for any server response).
+
+The method returns the object itself if successful, and C<undef> otherwise.
+
+=cut
+
 sub update_messages {
 	my ($self) = @_;
 	
@@ -159,10 +319,20 @@ sub update_messages {
 		}
 		
 		eval {
+			my $loaded = 0;
+			
 			unless (defined $uidnext) {
 				# Initially $uidnext is undef (except it was set explicitly)
-				$buffer = $imap->messages or die $imap;
-			} else {
+				if ($self->{skip_initial}) {
+					$uidnext = $imap->uidnext($imap->Folder) or die $imap;
+					$self->{uidnext} = $uidnext;
+				} else {
+					$buffer = $imap->messages or die $imap;
+					$loaded = 1;
+				}
+			}
+			
+			unless ($loaded) {
 				$buffer = $imap->search("UID $uidnext:*") or die $imap;
 				$buffer = [grep {$uidnext <= $_} @$buffer];
 			}
@@ -189,4 +359,56 @@ sub update_messages {
 	return $self;
 }
 
-1;
+=head1 AUTHOR
+
+Mahiro Ando, C<< <mahiro at cpan.org> >>
+
+=head1 BUGS
+
+Please report any bugs or feature requests to C<bug-mail-imapqueue at rt.cpan.org>, or through
+the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Mail-IMAPQueue>.  I will be notified, and then you'll
+automatically be notified of progress on your bug as I make changes.
+
+=head1 SUPPORT
+
+You can find documentation for this module with the perldoc command.
+
+    perldoc Mail::IMAPQueue
+
+You can also look for information at:
+
+=over 4
+
+=item * RT: CPAN's request tracker (report bugs here)
+
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Mail-IMAPQueue>
+
+=item * AnnoCPAN: Annotated CPAN documentation
+
+L<http://annocpan.org/dist/Mail-IMAPQueue>
+
+=item * CPAN Ratings
+
+L<http://cpanratings.perl.org/d/Mail-IMAPQueue>
+
+=item * Search CPAN
+
+L<http://search.cpan.org/dist/Mail-IMAPQueue/>
+
+=back
+
+=head1 ACKNOWLEDGEMENTS
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2012 Mahiro Ando.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+See http://dev.perl.org/licenses/ for more information.
+
+=cut
+
+1; # End of Mail::IMAPQueue
