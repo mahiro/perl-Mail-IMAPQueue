@@ -3,3 +3,4 @@ MANIFEST.SKIP
 .gitignore
 ignore.txt
 t/boilerplate.t
+Makefile.old
