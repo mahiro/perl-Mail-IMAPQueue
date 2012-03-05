@@ -1,0 +1,5 @@
+MANIFEST.SKIP
+.git
+.gitignore
+ignore.txt
+t/boilerplate.t
