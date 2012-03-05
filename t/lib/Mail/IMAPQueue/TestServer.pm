@@ -8,17 +8,20 @@ use IO::Socket::INET;
 use List::Util qw(max);
 
 sub new {
-	my ($class, $min_port, $init_uids) = @_;
+	my ($class, $init_uids) = @_;
 	my $server_sock;
-	my $port = $min_port;
+	my $port;
 	
-	until ($server_sock) {
-		$server_sock = IO::Socket::INET->new(
+	my $min_port = $ENV{MAIL_IMAPQUEUE_TESTSERVER_MINPORT} || 20000;
+	my $max_port = $ENV{MAIL_IMAPQUEUE_TESTSERVER_MAXPORT} || ($min_port + 1000);
+	
+	for ($port = $min_port; $port <= $max_port; $port++) {
+		last if $server_sock = IO::Socket::INET->new(
 			LocalPort => $port,
 			Proto     => 'tcp',
 			ReuseAddr => 1,
 			Listen    => 5,
-		) or do {$port++};
+		);
 	}
 	
 	return undef unless $server_sock;
@@ -45,7 +48,7 @@ sub new {
 		) or die "failed to start server at port $port: $@";
 		
 		_run_server($server_sock, $init_uids);
-		
+		$server_sock->close;
 		exit;
 	}
 }
@@ -138,9 +141,9 @@ sub _run_server {
 	}
 }
 
-sub DESTROY {
+sub stop {
 	my ($self) = @_;
-	kill 15, $self->{pid};
+	kill INT => $self->{pid};
 }
 
 1;

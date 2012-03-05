@@ -11,7 +11,13 @@ use Mail::IMAPClient;
 use Mail::IMAPQueue;
 use Mail::IMAPQueue::TestServer;
 
-my $server = Mail::IMAPQueue::TestServer->new(20000, [1, 2, 3]);
+my $server = Mail::IMAPQueue::TestServer->new([1, 2, 3]) or do {
+	diag "Could not start test server ".
+		"(Try setting env var MAIL_IMAPQUEUE_TESTSERVER_MINPORT)";
+	exit 1;
+};
+
+local $SIG{INT} = sub {$server->stop()};
 
 sub run {
 	my $callback = shift;
@@ -128,10 +134,15 @@ subtest skip_initial => sub {
 };
 
 subtest methods => sub {
-	plan tests => 36;
+	plan tests => 39;
 	
 	run(sub {
 		my ($queue, $imap) = @_;
+		
+		# Buffer is empty initially
+		ok $queue->is_empty;
+		is($queue->peek_message, undef);
+		is_deeply(scalar($queue->peek_messages), []);
 		
 		# Load initial 3 messages
 		$queue->ensure_messages;
@@ -252,3 +263,5 @@ subtest messages_during_idle => sub {
 };
 
 # TODO: tests for disconnection
+
+$server->stop();
