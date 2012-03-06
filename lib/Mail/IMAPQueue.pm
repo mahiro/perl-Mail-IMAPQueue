@@ -51,7 +51,7 @@ continuously process incoming email messages.
 The module utilizes L<Mail::IMAPClient> as an IMAP client interface.
 
 The instance of C<Mail::IMAPQueue> maintains a buffer internally,
-and loads the message sequence numbers (of UIDs) into the buffer as necessary.
+and loads the message sequence numbers (or UIDs) into the buffer as necessary.
 When there are no messages in the mailbox while the buffer is empty,
 it will wait until new messages are received in the mailbox.
 
