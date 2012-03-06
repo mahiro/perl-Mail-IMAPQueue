@@ -1,6 +1,9 @@
-MANIFEST.SKIP
 .git
 .gitignore
+MANIFEST.SKIP
+Makefile.old
 ignore.txt
 t/boilerplate.t
-Makefile.old
+t/manifest.t
+t/pod-coverage.t
+t/pod.t
