@@ -7,6 +7,12 @@ use Test::More tests => 3;
 
 sub not_in_file_ok {
     my ($filename, %regex) = @_;
+
+    if ($filename !~ m{^/}) {
+        (my $dir = __FILE__) =~ s{/+[^/]+/*$}{};
+        $filename = "$dir/../$filename";
+	}
+
     open( my $fh, '<', $filename )
         or die "couldn't open $filename for reading: $!";
 
