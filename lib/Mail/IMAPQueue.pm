@@ -119,7 +119,7 @@ for real-time updates from the server.
 
 =head2 Controlling timing of fetching and waiting
 
-    while ($queue->update_messages()) { # non-blocking
+    while ($queue->reload_messages()) { # non-blocking
         my $msg_list = $queue->peek_messages or die $@; # non-blocking
         if (@$msg_list) {
             for my $msg (@$msg_list) {
@@ -321,7 +321,7 @@ sub ensure_messages {
 	
 	if ($self->is_empty) {
 		while (1) {
-			$self->update_messages or return undef;
+			$self->reload_messages or return undef;
 			
 			if ($self->is_empty) {
 				$self->attempt_idle() or return undef;
@@ -373,7 +373,7 @@ sub attempt_idle {
 	return $self;
 }
 
-=head2 $queue->update_messages()
+=head2 $queue->reload_messages()
 
 Discard the current buffer, and attempt to load any messages from the mailbox to the buffer.
 The call is not blocked (except for the usual socket wait for any server response).
@@ -386,7 +386,7 @@ In order to test the last result of loading, the C<is_empty()> method can be use
 
 =cut
 
-sub update_messages {
+sub reload_messages {
 	my ($self) = @_;
 	
 	my $uidnext = $self->{uidnext};

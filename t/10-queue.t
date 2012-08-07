@@ -114,7 +114,7 @@ subtest skip_initial => sub {
 	
 	run(sub {
 		my ($queue, $imap) = @_;
-		$queue->update_messages;
+		$queue->reload_messages;
 		is_deeply($queue->peek_messages, []);
 		
 		for (my $i = 0; $i < 6; $i++) {
@@ -199,7 +199,7 @@ subtest methods => sub {
 		is_deeply(scalar($queue->peek_messages), [6]);
 		
 		# Discard buffer, and forcefully fetch new messages
-		$queue->update_messages;
+		$queue->reload_messages;
 		
 		ok !$queue->is_empty;
 		is($queue->peek_message, 7);
@@ -213,7 +213,7 @@ subtest methods => sub {
 		is_deeply(scalar($queue->peek_messages), []);
 		
 		# Fetch messages (non-blocking) where nothing new on the server side
-		$queue->update_messages;
+		$queue->reload_messages;
 		
 		ok $queue->is_empty;
 		is($queue->peek_message, undef);
