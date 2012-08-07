@@ -12,12 +12,14 @@ use Mail::IMAPQueue;
 use Mail::IMAPQueue::TestServer;
 
 my $server = Mail::IMAPQueue::TestServer->new([1, 2, 3]) or do {
-	diag "Could not start test server ".
-		"(Try setting env var MAIL_IMAPQUEUE_TESTSERVER_MINPORT)";
+	diag "Could not start test IMAP server";
 	exit 1;
 };
 
-local $SIG{INT} = sub {$server->stop()};
+END {
+	$server->stop if $server;
+	exit 0;
+}
 
 sub run {
 	my $callback = shift;
@@ -263,5 +265,3 @@ subtest messages_during_idle => sub {
 };
 
 # TODO: tests for disconnection
-
-$server->stop();

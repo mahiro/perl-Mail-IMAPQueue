@@ -9,44 +9,30 @@ use List::Util qw(max);
 
 sub new {
 	my ($class, $init_uids) = @_;
-	my $server_sock;
-	my $port;
 	
-	my $min_port = $ENV{MAIL_IMAPQUEUE_TESTSERVER_MINPORT} || 20000;
-	my $max_port = $ENV{MAIL_IMAPQUEUE_TESTSERVER_MAXPORT} || ($min_port + 1000);
+	my $server_sock = IO::Socket::INET->new(
+		LocalAddr => '127.0.0.1',
+		LocalPort => 0,
+		Proto     => 'tcp',
+		Listen    => 1,
+	) or return undef;
 	
-	for ($port = $min_port; $port <= $max_port; $port++) {
-		last if $server_sock = IO::Socket::INET->new(
-			LocalPort => $port,
-			Proto     => 'tcp',
-			ReuseAddr => 1,
-			Listen    => 5,
-		);
-	}
-	
-	return undef unless $server_sock;
-	$server_sock->close;
-	undef $server_sock;
+	my $port = $server_sock->sockport;
 	
 	my $pid = fork;
 	die "fork failed: $!" unless defined $pid;
 	
 	if ($pid) {
 		# Parent process
+		$server_sock->close();
+		undef $server_sock;
+		
 		return bless {
 			pid => $pid,
 			port => $port,
-			min_port => $min_port,
 		}, $class;
 	} else {
 		# Child process (run server in background)
-		$server_sock = IO::Socket::INET->new(
-			LocalPort => $port,
-			Proto     => 'tcp',
-			ReuseAddr => 1,
-			Listen    => 1,
-		) or die "failed to start server at port $port: $@";
-		
 		_run_server($server_sock, $init_uids);
 		$server_sock->close;
 		exit;
@@ -55,22 +41,23 @@ sub new {
 
 sub connect_client {
 	my ($server) = @_;
-	my $client_sock;
 	
-	until ($client_sock) {
-		$client_sock = IO::Socket::INET->new(
-			PeerHost => 'localhost',
-			PeerPort => $server->{port},
-			Proto => 'tcp',
-		) or do {sleep 0.1};
-	}
-	
-	return $client_sock;
+	return IO::Socket::INET->new(
+		PeerHost => 'localhost',
+		PeerPort => $server->{port},
+		Proto => 'tcp',
+	);
 }
 
 sub _run_server {
 	my ($server_sock, $init_uids) = @_;
 	my $uidvalidity = 'foo';
+	
+	local $SIG{INT} = sub {
+		$server_sock->shutdown(2);
+		$server_sock->close();
+		exit 130;
+	};
 	
 	while (my $client_sock = $server_sock->accept) {
 		my $uids = [@$init_uids];
@@ -144,6 +131,7 @@ sub _run_server {
 sub stop {
 	my ($self) = @_;
 	kill INT => $self->{pid};
+	waitpid $self->{pid}, 0;
 }
 
 1;
