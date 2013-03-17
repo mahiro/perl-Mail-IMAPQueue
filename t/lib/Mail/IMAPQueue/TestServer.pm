@@ -130,8 +130,13 @@ sub _run_server {
 
 sub stop {
 	my ($self) = @_;
-	kill INT => $self->{pid};
-	waitpid $self->{pid}, 0;
+	
+	if ($^O eq 'MSWin32') {
+		kill TERM => $self->{pid};
+	} else {
+		kill INT => $self->{pid};
+		waitpid $self->{pid}, 0;
+	}
 }
 
 1;
