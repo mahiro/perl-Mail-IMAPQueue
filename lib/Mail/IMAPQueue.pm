@@ -41,11 +41,11 @@ Mail::IMAPQueue - IMAP client extension to watch and process a mailbox as a queu
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use List::Util qw(max);
 use Scalar::Util qw(blessed);

@@ -1,5 +1,8 @@
 Revision history for Mail-IMAPQueue
 
+0.04    Jul 20 2014
+        Cleanup code/docs
+
 0.03    Mar 22 2013
         Specify prerequisite module versions in Makefile.PL
 
