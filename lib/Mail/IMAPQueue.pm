@@ -178,26 +178,26 @@ for C<attempt_idle()> method, which is for one timeout round).
 =cut
 
 sub new {
-	my $class = shift;
-	
-	my $self = bless {
-		client         => undef,
-		buffer         => [],
-		index          => 0,
-		uidnext        => undef,
-		skip_initial   => 0,
-		idle_timeout   => 30,
-		@_
-	}, $class;
-	
-	my $imap = $self->{client};
-	
-	unless (blessed($imap)) {
-		$@ = "Parameter 'client' must be given (Mail::IMAPClient)";
-		return undef;
-	}
-	
-	return $self;
+    my $class = shift;
+    
+    my $self = bless {
+        client         => undef,
+        buffer         => [],
+        index          => 0,
+        uidnext        => undef,
+        skip_initial   => 0,
+        idle_timeout   => 30,
+        @_
+    }, $class;
+    
+    my $imap = $self->{client};
+    
+    unless (blessed($imap)) {
+        $@ = "Parameter 'client' must be given (Mail::IMAPClient)";
+        return undef;
+    }
+    
+    return $self;
 }
 
 =head2 $queue->is_empty()
@@ -207,8 +207,8 @@ Return 1 if the current buffer is empty, and 0 otherwise.
 =cut
 
 sub is_empty {
-	my ($self) = @_;
-	return $self->{index} >= @{$self->{buffer}};
+    my ($self) = @_;
+    return $self->{index} >= @{$self->{buffer}};
 }
 
 =head2 $queue->dequeue_message()
@@ -225,17 +225,17 @@ C<undef> is returned if the attempt to load the messages was failed.
 =cut
 
 sub dequeue_message {
-	my ($self) = @_;
-	$self->ensure_messages;
-	return undef if $self->is_empty;
-	
-	my $index = $self->{index};
-	my $buffer = $self->{buffer};
-	
-	my $message = $buffer->[$index];
-	$self->{index}++;
-	
-	return $message;
+    my ($self) = @_;
+    $self->ensure_messages;
+    return undef if $self->is_empty;
+    
+    my $index = $self->{index};
+    my $buffer = $self->{buffer};
+    
+    my $message = $buffer->[$index];
+    $self->{index}++;
+    
+    return $message;
 }
 
 =head2 $queue->dequeue_messages()
@@ -253,17 +253,17 @@ C<undef> is returned if the attempt to load the messages was failed.
 =cut
 
 sub dequeue_messages {
-	my ($self) = @_;
-	$self->ensure_messages;
-	return undef if $self->is_empty;
-	
-	my $index = $self->{index};
-	my $buffer = $self->{buffer};
-	
-	my $messages = [@$buffer[$index..$#$buffer]];
-	$self->{index} = @$buffer;
-	
-	return wantarray ? @$messages : $messages;
+    my ($self) = @_;
+    $self->ensure_messages;
+    return undef if $self->is_empty;
+    
+    my $index = $self->{index};
+    my $buffer = $self->{buffer};
+    
+    my $messages = [@$buffer[$index..$#$buffer]];
+    $self->{index} = @$buffer;
+    
+    return wantarray ? @$messages : $messages;
 }
 
 =head2 $queue->peek_message()
@@ -277,13 +277,13 @@ C<undef> is returned if the current buffer is empty.
 =cut
 
 sub peek_message {
-	my ($self) = @_;
-	return undef if $self->is_empty;
-	
-	my $index = $self->{index};
-	my $buffer = $self->{buffer};
-	
-	return $buffer->[$index];
+    my ($self) = @_;
+    return undef if $self->is_empty;
+    
+    my $index = $self->{index};
+    my $buffer = $self->{buffer};
+    
+    return $buffer->[$index];
 }
 
 =head2 $queue->peek_messages()
@@ -297,15 +297,15 @@ In the scalar context, a reference to the array is returned.
 =cut
 
 sub peek_messages {
-	my ($self) = @_;
-	return [] if $self->is_empty;
-	
-	my $index = $self->{index};
-	my $buffer = $self->{buffer};
-	
-	my $messages = [@$buffer[$index..$#$buffer]];
-	
-	return wantarray ? @$messages : $messages;
+    my ($self) = @_;
+    return [] if $self->is_empty;
+    
+    my $index = $self->{index};
+    my $buffer = $self->{buffer};
+    
+    my $messages = [@$buffer[$index..$#$buffer]];
+    
+    return wantarray ? @$messages : $messages;
 }
 
 =head2 $queue->ensure_messages()
@@ -317,22 +317,22 @@ The method returns the object itself if successful, and C<undef> otherwise.
 =cut
 
 sub ensure_messages {
-	my ($self) = @_;
-	
-	if ($self->is_empty) {
-		while (1) {
-			$self->reload_messages or return undef;
-			
-			if ($self->is_empty) {
-				$self->attempt_idle() or return undef;
-			} else {
-				# success
-				return $self;
-			}
-		}
-	}
-	
-	return $self;
+    my ($self) = @_;
+    
+    if ($self->is_empty) {
+        while (1) {
+            $self->reload_messages or return undef;
+            
+            if ($self->is_empty) {
+                $self->attempt_idle() or return undef;
+            } else {
+                # success
+                return $self;
+            }
+        }
+    }
+    
+    return $self;
 }
 
 =head2 $queue->attempt_idle()
@@ -346,31 +346,31 @@ If the timeout has elapsed gracefully, it is considered to be a success.
 =cut
 
 sub attempt_idle {
-	my ($self) = @_;
-	my $imap = $self->{client};
-	my $idle_timeout = $self->{idle_timeout} || 30;
-	
-	eval {
-		my $idle_tag = $imap->idle or die $imap;
-		
-		my $idle_data = $imap->idle_data($idle_timeout);
-		# do not die even if this fails; always send DONE anyway
-		
-		$imap->done($idle_tag) or die $imap;
-	};
-	
-	if ($@) {
-		if (ref $@ && $@ == $imap) {
-			$imap->reconnect or do {
-				$@ = "Disconnected while attempting IDLE";
-				return undef;
-			};
-		} else {
-			return undef;
-		}
-	}
-	
-	return $self;
+    my ($self) = @_;
+    my $imap = $self->{client};
+    my $idle_timeout = $self->{idle_timeout} || 30;
+    
+    eval {
+        my $idle_tag = $imap->idle or die $imap;
+        
+        my $idle_data = $imap->idle_data($idle_timeout);
+        # do not die even if this fails; always send DONE anyway
+        
+        $imap->done($idle_tag) or die $imap;
+    };
+    
+    if ($@) {
+        if (ref $@ && $@ == $imap) {
+            $imap->reconnect or do {
+                $@ = "Disconnected while attempting IDLE";
+                return undef;
+            };
+        } else {
+            return undef;
+        }
+    }
+    
+    return $self;
 }
 
 =head2 $queue->reload_messages()
@@ -387,58 +387,58 @@ In order to test the last result of loading, the C<is_empty()> method can be use
 =cut
 
 sub reload_messages {
-	my ($self) = @_;
-	
-	my $uidnext = $self->{uidnext};
-	my $buffer = [];
-	
-	TRY: {
-		my $imap = $self->{client};
-		
-		unless ($imap->IsSelected) {
-			$@ = "Folder must be selected";
-			return undef;
-		}
-		
-		eval {
-			my $loaded = 0;
-			
-			unless (defined $uidnext) {
-				# Initially $uidnext is undef (except it was set explicitly)
-				if ($self->{skip_initial}) {
-					$uidnext = $imap->uidnext($imap->Folder) or die $imap;
-					$self->{uidnext} = $uidnext;
-				} else {
-					$buffer = $imap->messages or die $imap;
-					$loaded = 1;
-				}
-			}
-			
-			unless ($loaded) {
-				$buffer = $imap->search("UID $uidnext:*") or die $imap;
-				$buffer = [grep {$uidnext <= $_} @$buffer];
-			}
-		};
-		
-		if ($@) {
-			if (ref $@ && $@ == $imap) {
-				$imap->reconnect or return undef;
-				redo TRY;
-			} else {
-				return undef;
-			}
-		}
-	}
-	
-	if (@$buffer > 0) {
-		$uidnext = max(@$buffer) + 1;
-		$self->{uidnext} = $uidnext;
-	}
-	
-	$self->{buffer} = $buffer;
-	$self->{index} = 0;
-	
-	return $self;
+    my ($self) = @_;
+    
+    my $uidnext = $self->{uidnext};
+    my $buffer = [];
+    
+    TRY: {
+        my $imap = $self->{client};
+        
+        unless ($imap->IsSelected) {
+            $@ = "Folder must be selected";
+            return undef;
+        }
+        
+        eval {
+            my $loaded = 0;
+            
+            unless (defined $uidnext) {
+                # Initially $uidnext is undef (except it was set explicitly)
+                if ($self->{skip_initial}) {
+                    $uidnext = $imap->uidnext($imap->Folder) or die $imap;
+                    $self->{uidnext} = $uidnext;
+                } else {
+                    $buffer = $imap->messages or die $imap;
+                    $loaded = 1;
+                }
+            }
+            
+            unless ($loaded) {
+                $buffer = $imap->search("UID $uidnext:*") or die $imap;
+                $buffer = [grep {$uidnext <= $_} @$buffer];
+            }
+        };
+        
+        if ($@) {
+            if (ref $@ && $@ == $imap) {
+                $imap->reconnect or return undef;
+                redo TRY;
+            } else {
+                return undef;
+            }
+        }
+    }
+    
+    if (@$buffer > 0) {
+        $uidnext = max(@$buffer) + 1;
+        $self->{uidnext} = $uidnext;
+    }
+    
+    $self->{buffer} = $buffer;
+    $self->{index} = 0;
+    
+    return $self;
 }
 
 =head1 AUTHOR

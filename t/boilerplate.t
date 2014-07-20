@@ -11,7 +11,7 @@ sub not_in_file_ok {
     if ($filename !~ m{^/}) {
         (my $dir = __FILE__) =~ s{/+[^/]+/*$}{};
         $filename = "$dir/../$filename";
-	}
+    }
 
     open( my $fh, '<', $filename )
         or die "couldn't open $filename for reading: $!";
