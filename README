@@ -59,7 +59,10 @@ perldoc command.
 
 You can also look for information at:
 
-    RT, CPAN's request tracker (report bugs here)
+    GitHub repository (report bugs here)
+        https://github.com/mahiro/perl-Mail-IMAPQueue
+
+    RT, CPAN's request tracker (report bugs here, alternatively)
         http://rt.cpan.org/NoAuth/Bugs.html?Dist=Mail-IMAPQueue
 
     AnnoCPAN, Annotated CPAN documentation
